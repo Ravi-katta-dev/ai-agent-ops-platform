@@ -1,84 +1,110 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
-import { WebSocketServer } from 'ws';
+import { Server as SocketServer } from 'socket.io';
 import dotenv from 'dotenv';
+
+import { errorHandler, notFound } from './middleware/errorHandler';
 import { logger } from './utils/logger';
-import { errorHandler } from './middleware/errorHandler';
-import { rateLimiter } from './middleware/rateLimiter';
+import { connectDatabase } from './config/database';
+
+// Import routes
 import agentRoutes from './routes/agents';
+import healthRoutes from './routes/health';
 import authRoutes from './routes/auth';
-import toolRoutes from './routes/tools';
-import { initializeDatabase } from './database/connection';
-import { AgentWebSocketManager } from './websocket/AgentWebSocketManager';
-import { ClaudeService } from './services/ClaudeService';
-import { ComposioService } from './services/ComposioService';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
 const server = createServer(app);
-const PORT = process.env.PORT || 3001;
+const io = new SocketServer(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    methods: ["GET", "POST"]
+  }
+});
 
-// Middleware
+const PORT = process.env.PORT || 5000;
+
+// Security middleware
 app.use(helmet());
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
-}));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(limiter);
+
+// CORS configuration
+const corsOptions = {
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+  credentials: true,
+};
+app.use(cors(corsOptions));
+
+// Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use(rateLimiter);
+
+// Request logging
+app.use((req, res, next) => {
+  logger.info(`${req.method} ${req.url}`);
+  next();
+});
 
 // Routes
+app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/agents', agentRoutes);
-app.use('/api/tools', toolRoutes);
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    memory: process.memoryUsage()
+// Error handling middleware
+app.use(notFound);
+app.use(errorHandler);
+
+// Socket.io connection handling
+io.on('connection', (socket) => {
+  logger.info(`Client connected: ${socket.id}`);
+  
+  socket.on('disconnect', () => {
+    logger.info(`Client disconnected: ${socket.id}`);
+  });
+
+  // Join agent rooms for specific updates
+  socket.on('join-agent', (agentId: string) => {
+    socket.join(`agent-${agentId}`);
+    logger.info(`Socket ${socket.id} joined agent-${agentId} room`);
+  });
+
+  // Leave agent rooms
+  socket.on('leave-agent', (agentId: string) => {
+    socket.leave(`agent-${agentId}`);
+    logger.info(`Socket ${socket.id} left agent-${agentId} room`);
   });
 });
 
-// WebSocket setup
-const wss = new WebSocketServer({ server });
-const wsManager = new AgentWebSocketManager(wss);
+// Make io available to other modules
+app.set('io', io);
 
-// Error handling
-app.use(errorHandler);
-
-// Initialize services
-async function initializeServices() {
+// Start server
+async function startServer() {
   try {
-    // Initialize database
-    await initializeDatabase();
-    logger.info('Database initialized successfully');
-
-    // Initialize Claude service
-    const claudeService = new ClaudeService();
-    await claudeService.initialize();
-    logger.info('Claude service initialized successfully');
-
-    // Initialize Composio service
-    const composioService = new ComposioService();
-    await composioService.initialize();
-    logger.info('Composio service initialized successfully');
-
-    // Start server
+    // Connect to database
+    await connectDatabase();
+    
     server.listen(PORT, () => {
-      logger.info(`AI Agent Ops Platform backend running on port ${PORT}`);
-      logger.info(`WebSocket server initialized`);
-      logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      logger.info(`🚀 AI Agent Ops Platform Backend running on port ${PORT}`);
+      logger.info(`🔧 Environment: ${process.env.NODE_ENV}`);
+      logger.info(`📊 Dashboard: ${process.env.FRONTEND_URL}`);
     });
   } catch (error) {
-    logger.error('Failed to initialize services:', error);
+    logger.error('Failed to start server:', error);
     process.exit(1);
   }
 }
@@ -98,7 +124,7 @@ process.on('SIGINT', () => {
   });
 });
 
-// Initialize everything
-initializeServices();
+startServer();
 
 export default app;
+export { io };
