@@ -2,121 +2,131 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { createServer } from 'http';
-import WebSocket from 'ws';
+import { Server as SocketIOServer } from 'socket.io';
 import dotenv from 'dotenv';
-import { setupDatabase } from './config/database';
-import { setupRedis } from './config/redis';
-import { setupRoutes } from './routes';
-import { WebSocketManager } from './services/websocket';
-import { AgentManager } from './services/agentManager';
-import { ClaudeService } from './services/claude';
-import { ComposioService } from './services/composio';
-import { Logger } from './utils/logger';
-import { errorHandler } from './middleware/errorHandler';
-import { rateLimiter } from './middleware/rateLimiter';
+import rateLimit from 'express-rate-limit';
+
+import { logger } from './utils/logger';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { requestLogger } from './middleware/requestLogger';
+import { authMiddleware } from './middleware/auth';
+
+// Import routes
+import agentRoutes from './routes/agents';
+import authRoutes from './routes/auth';
+import toolRoutes from './routes/tools';
+import webhookRoutes from './routes/webhooks';
+
+// Import services
+import { ClaudeService } from './services/claude.service';
+import { ComposioService } from './services/composio.service';
+import { SocketService } from './services/socket.service';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
-const server = createServer(app);
-const wss = new WebSocket.Server({ server });
+const httpServer = createServer(app);
+const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    methods: ['GET', 'POST']
+  }
+});
 
-// Initialize services
-const logger = new Logger();
-const wsManager = new WebSocketManager(wss, logger);
-const claudeService = new ClaudeService();
-const composioService = new ComposioService();
-const agentManager = new AgentManager(claudeService, composioService, wsManager, logger);
+const PORT = process.env.PORT || 5000;
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.'
+});
 
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use(rateLimiter);
+app.use(limiter);
+app.use(requestLogger);
 
-// Health check
+// Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
-    status: 'healthy',
+    status: 'ok',
     timestamp: new Date().toISOString(),
     version: process.env.npm_package_version || '0.1.0',
-    agents: agentManager.getAgentStatus()
+    services: {
+      claude: ClaudeService.isInitialized(),
+      composio: ComposioService.isInitialized()
+    }
   });
 });
 
 // API Routes
-setupRoutes(app, agentManager);
+app.use('/api/auth', authRoutes);
+app.use('/api/agents', authMiddleware, agentRoutes);
+app.use('/api/tools', authMiddleware, toolRoutes);
+app.use('/api/webhooks', webhookRoutes);
 
 // Error handling
+app.use(notFoundHandler);
 app.use(errorHandler);
 
-// Initialize services and start server
+// Initialize services
+async function initializeServices() {
+  try {
+    await ClaudeService.initialize();
+    await ComposioService.initialize();
+    
+    // Initialize Socket service
+    SocketService.initialize(io);
+    
+    logger.info('All services initialized successfully');
+  } catch (error) {
+    logger.error('Failed to initialize services:', error);
+    process.exit(1);
+  }
+}
+
+// Start server
 async function startServer() {
   try {
-    // Setup database
-    await setupDatabase();
-    logger.info('Database connected successfully');
-
-    // Setup Redis
-    await setupRedis();
-    logger.info('Redis connected successfully');
-
-    // Initialize Claude service
-    await claudeService.initialize();
-    logger.info('Claude AI service initialized');
-
-    // Initialize Composio service
-    await composioService.initialize();
-    logger.info('Composio service initialized');
-
-    // Initialize agents
-    await agentManager.initializeAgents();
-    logger.info('All agents initialized successfully');
-
-    const PORT = process.env.PORT || 8000;
-    server.listen(PORT, () => {
-      logger.info(`AI Agent Ops Platform server running on port ${PORT}`);
-      logger.info(`WebSocket server running on port ${PORT}`);
-      logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    await initializeServices();
+    
+    httpServer.listen(PORT, () => {
+      logger.info(`🚀 AI Agent Ops Platform server running on port ${PORT}`);
+      logger.info(`🧠 Claude AI: ${ClaudeService.isInitialized() ? 'Connected' : 'Disconnected'}`);
+      logger.info(`🔗 Composio: ${ComposioService.isInitialized() ? 'Connected' : 'Disconnected'}`);
+      logger.info(`⚡ Socket.IO: Active`);
     });
-
-    // Handle graceful shutdown
-    process.on('SIGTERM', gracefulShutdown);
-    process.on('SIGINT', gracefulShutdown);
-
   } catch (error) {
     logger.error('Failed to start server:', error);
     process.exit(1);
   }
 }
 
-async function gracefulShutdown() {
-  logger.info('Received shutdown signal. Gracefully shutting down...');
-  
-  // Stop accepting new connections
-  server.close(() => {
-    logger.info('HTTP server closed');
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  httpServer.close(() => {
+    logger.info('Server closed');
+    process.exit(0);
   });
+});
 
-  // Close WebSocket connections
-  wsManager.closeAllConnections();
+process.on('SIGINT', () => {
+  logger.info('SIGINT received, shutting down gracefully');
+  httpServer.close(() => {
+    logger.info('Server closed');
+    process.exit(0);
+  });
+});
 
-  // Stop all agents
-  await agentManager.stopAllAgents();
-
-  // Close database connections
-  // await database.close();
-
-  logger.info('Graceful shutdown completed');
-  process.exit(0);
-}
-
-// Start the server
 startServer();
 
-export { app, server, wss };
+export { app, io };
