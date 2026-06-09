@@ -5,111 +5,111 @@ import { logger } from '../utils/logger';
 
 const router = express.Router();
 
-// Mock agent data (will be replaced with database in Step 2D)
+// Mock agent data for now (will be replaced with database queries)
 const mockAgents = [
   {
-    id: '1',
+    id: 'devops-001',
     name: 'DevOps Engineer',
     type: 'devops',
     status: 'active',
-    tasksCompleted: 23,
+    tasksCompleted: 42,
     efficiency: 94,
-    description: 'Manages deployments, CI/CD, infrastructure, and monitoring',
-    icon: 'Server',
-    color: 'blue',
-    lastActivity: new Date().toISOString(),
-    currentTask: 'Monitoring deployment pipeline'
+    lastActive: new Date().toISOString(),
+    capabilities: ['CI/CD', 'Infrastructure', 'Monitoring', 'Deployments'],
+    currentTask: 'Monitoring production deployment',
+    tools: ['GitHub', 'Docker', 'AWS', 'Jenkins']
   },
   {
-    id: '2', 
+    id: 'data-001',
     name: 'Data Analyst',
-    type: 'data_analyst',
+    type: 'data',
     status: 'working',
-    tasksCompleted: 18,
+    tasksCompleted: 28,
     efficiency: 87,
-    description: 'Processes metrics, generates insights, and creates reports',
-    icon: 'BarChart3',
-    color: 'green',
-    lastActivity: new Date().toISOString(),
-    currentTask: 'Generating weekly analytics report'
+    lastActive: new Date().toISOString(),
+    capabilities: ['Analytics', 'Reporting', 'Data Processing', 'Insights'],
+    currentTask: 'Generating weekly performance report',
+    tools: ['Google Analytics', 'Tableau', 'SQL', 'Python']
   },
   {
-    id: '3',
+    id: 'support-001',
     name: 'Customer Support',
-    type: 'customer_support', 
-    status: 'idle',
-    tasksCompleted: 31,
-    efficiency: 96,
-    description: 'Handles inquiries, tickets, and user communication',
-    icon: 'MessageSquare',
-    color: 'purple',
-    lastActivity: new Date().toISOString(),
-    currentTask: null
+    type: 'support',
+    status: 'active',
+    tasksCompleted: 156,
+    efficiency: 92,
+    lastActive: new Date().toISOString(),
+    capabilities: ['Customer Service', 'Ticket Management', 'Communication'],
+    currentTask: 'Responding to customer inquiries',
+    tools: ['Gmail', 'Slack', 'Zendesk', 'Intercom']
   },
   {
-    id: '4',
+    id: 'marketing-001',
     name: 'Marketing Manager',
     type: 'marketing',
-    status: 'active',
-    tasksCompleted: 15,
-    efficiency: 82,
-    description: 'Manages campaigns, content creation, and social media',
-    icon: 'Megaphone', 
-    color: 'orange',
-    lastActivity: new Date().toISOString(),
-    currentTask: 'Creating social media campaign'
+    status: 'idle',
+    tasksCompleted: 73,
+    efficiency: 89,
+    lastActive: new Date(Date.now() - 300000).toISOString(), // 5 mins ago
+    capabilities: ['Campaign Management', 'Content Creation', 'Social Media'],
+    currentTask: null,
+    tools: ['Facebook Ads', 'Twitter', 'Mailchimp', 'Canva']
   },
   {
-    id: '5',
+    id: 'security-001',
     name: 'Security Specialist',
     type: 'security',
     status: 'active',
-    tasksCompleted: 12,
-    efficiency: 98,
-    description: 'Monitors threats, manages access, and ensures compliance',
-    icon: 'Shield',
-    color: 'red',
-    lastActivity: new Date().toISOString(),
-    currentTask: 'Security audit in progress'
+    tasksCompleted: 19,
+    efficiency: 96,
+    lastActive: new Date().toISOString(),
+    capabilities: ['Threat Detection', 'Access Management', 'Compliance'],
+    currentTask: 'Scanning for security vulnerabilities',
+    tools: ['Auth0', 'Cloudflare', 'Snyk', 'Okta']
   },
   {
-    id: '6',
+    id: 'coordinator-001',
     name: 'AI Coordinator',
-    type: 'ai_coordinator',
-    status: 'working',
-    tasksCompleted: 27,
-    efficiency: 91,
-    description: 'Orchestrates agents, optimizes workflows, and manages resources',
-    icon: 'Brain',
-    color: 'indigo',
-    lastActivity: new Date().toISOString(),
-    currentTask: 'Optimizing agent task distribution'
+    type: 'coordinator',
+    status: 'active',
+    tasksCompleted: 67,
+    efficiency: 98,
+    lastActive: new Date().toISOString(),
+    capabilities: ['Agent Orchestration', 'Resource Management', 'Optimization'],
+    currentTask: 'Optimizing agent workload distribution',
+    tools: ['Composio', 'Claude API', 'Webhook Manager', 'Task Queue']
   }
 ];
 
-// @desc    Get all agents with status and metrics
+// @desc    Get all agents
 // @route   GET /api/agents
 // @access  Public (will be Private later)
 const getAllAgents = asyncHandler(async (req: Request, res: Response) => {
-  logger.info('Fetching all agents');
+  logger.info('Fetching all agents status');
   
-  // Calculate summary statistics
-  const totalAgents = mockAgents.length;
-  const activeAgents = mockAgents.filter(agent => agent.status === 'active' || agent.status === 'working').length;
-  const totalTasksCompleted = mockAgents.reduce((sum, agent) => sum + agent.tasksCompleted, 0);
-  const averageEfficiency = Math.round(mockAgents.reduce((sum, agent) => sum + agent.efficiency, 0) / totalAgents);
-  
+  // TODO: Replace with database query
+  const agentsWithMetrics = mockAgents.map(agent => ({
+    ...agent,
+    uptime: Math.floor(Math.random() * 24) + 1, // Mock uptime in hours
+    memory_usage: Math.floor(Math.random() * 40) + 10, // Mock memory %
+    response_time: Math.floor(Math.random() * 200) + 50 // Mock response time ms
+  }));
+
+  const summary = {
+    total_agents: agentsWithMetrics.length,
+    active_agents: agentsWithMetrics.filter(a => a.status === 'active').length,
+    working_agents: agentsWithMetrics.filter(a => a.status === 'working').length,
+    idle_agents: agentsWithMetrics.filter(a => a.status === 'idle').length,
+    total_tasks_completed: agentsWithMetrics.reduce((sum, agent) => sum + agent.tasksCompleted, 0),
+    average_efficiency: Math.round(agentsWithMetrics.reduce((sum, agent) => sum + agent.efficiency, 0) / agentsWithMetrics.length)
+  };
+
   res.status(200).json({
     success: true,
     data: {
-      agents: mockAgents,
-      summary: {
-        totalAgents,
-        activeAgents,
-        totalTasksCompleted,
-        averageEfficiency,
-        timestamp: new Date().toISOString()
-      }
+      agents: agentsWithMetrics,
+      summary,
+      timestamp: new Date().toISOString()
     }
   });
 });
@@ -119,9 +119,10 @@ const getAllAgents = asyncHandler(async (req: Request, res: Response) => {
 // @access  Public (will be Private later)
 const getAgentById = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  logger.info(`Fetching agent with ID: ${id}`);
+  logger.info(`Fetching agent details for ID: ${id}`);
   
-  const agent = mockAgents.find(agent => agent.id === id);
+  // TODO: Replace with database query
+  const agent = mockAgents.find(a => a.id === id);
   
   if (!agent) {
     res.status(404).json({
@@ -130,29 +131,44 @@ const getAgentById = asyncHandler(async (req: Request, res: Response) => {
     });
     return;
   }
-  
-  // Add detailed information for individual agent
+
+  // Add detailed metrics for specific agent
   const detailedAgent = {
     ...agent,
-    capabilities: getAgentCapabilities(agent.type),
-    recentTasks: getRecentTasks(agent.id),
-    performance: getPerformanceMetrics(agent.id)
+    metrics: {
+      uptime_hours: Math.floor(Math.random() * 24) + 1,
+      memory_usage_mb: Math.floor(Math.random() * 100) + 50,
+      cpu_usage_percent: Math.floor(Math.random() * 30) + 5,
+      response_time_ms: Math.floor(Math.random() * 200) + 50,
+      error_rate: Math.random() * 2, // 0-2% error rate
+      requests_per_minute: Math.floor(Math.random() * 50) + 10
+    },
+    recent_tasks: [
+      {
+        id: 'task-' + Math.random().toString(36).substr(2, 9),
+        description: agent.currentTask || 'No current task',
+        status: agent.status === 'active' ? 'in_progress' : 'completed',
+        started_at: new Date(Date.now() - Math.random() * 3600000).toISOString(),
+        estimated_completion: new Date(Date.now() + Math.random() * 1800000).toISOString()
+      }
+    ]
   };
-  
+
   res.status(200).json({
     success: true,
     data: detailedAgent
   });
 });
 
-// @desc    Get agent tasks by agent ID
+// @desc    Get agent tasks
 // @route   GET /api/agents/:id/tasks
 // @access  Public (will be Private later)
 const getAgentTasks = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   logger.info(`Fetching tasks for agent ID: ${id}`);
   
-  const agent = mockAgents.find(agent => agent.id === id);
+  // TODO: Replace with database query
+  const agent = mockAgents.find(a => a.id === id);
   
   if (!agent) {
     res.status(404).json({
@@ -161,97 +177,64 @@ const getAgentTasks = asyncHandler(async (req: Request, res: Response) => {
     });
     return;
   }
-  
-  const tasks = getRecentTasks(id);
-  
+
+  // Mock tasks for the agent
+  const tasks = [
+    {
+      id: 'task-001',
+      title: agent.currentTask || 'Idle - Awaiting instructions',
+      status: agent.status === 'active' ? 'in_progress' : agent.status === 'working' ? 'in_progress' : 'pending',
+      priority: 'high',
+      created_at: new Date(Date.now() - 1800000).toISOString(), // 30 mins ago
+      estimated_duration: '15-30 minutes',
+      tools_required: agent.tools.slice(0, 2)
+    },
+    {
+      id: 'task-002', 
+      title: 'Weekly performance optimization',
+      status: 'completed',
+      priority: 'medium',
+      created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+      completed_at: new Date(Date.now() - 82800000).toISOString(), // 23 hours ago
+      estimated_duration: '45 minutes',
+      tools_required: agent.tools.slice(-2)
+    }
+  ];
+
   res.status(200).json({
     success: true,
     data: {
-      agentId: id,
-      agentName: agent.name,
-      tasks,
-      totalTasks: tasks.length,
-      completedTasks: tasks.filter(task => task.status === 'completed').length,
-      pendingTasks: tasks.filter(task => task.status === 'pending').length,
-      timestamp: new Date().toISOString()
+      agent_id: id,
+      agent_name: agent.name,
+      total_tasks: tasks.length,
+      active_tasks: tasks.filter(t => t.status === 'in_progress').length,
+      completed_tasks: tasks.filter(t => t.status === 'completed').length,
+      tasks
     }
   });
 });
 
 // @desc    Update agent status (placeholder)
 // @route   PUT /api/agents/:id/status
-// @access  Private
+// @access  Private (placeholder)
 const updateAgentStatus = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   const { status } = req.body;
   
-  logger.info(`Attempting to update agent ${id} status to: ${status}`);
+  logger.info(`Status update request for agent ${id}: ${status}`);
   
-  // TODO: Implement in Phase B with proper validation and database
+  // TODO: Implement agent status update logic
   res.status(501).json({
     success: false,
     message: 'Agent status update not yet implemented',
     data: {
-      note: 'This endpoint will be implemented in Phase B with database integration',
+      note: 'This endpoint will be implemented in Phase B (Agent Management)',
       requested_agent: id,
       requested_status: status,
       valid_statuses: ['active', 'idle', 'working', 'maintenance']
     }
   });
 });
-
-// Helper functions for mock data
-function getAgentCapabilities(agentType: string): string[] {
-  const capabilities: { [key: string]: string[] } = {
-    devops: ['CI/CD Management', 'Infrastructure Monitoring', 'Deployment Automation', 'Security Scanning'],
-    data_analyst: ['Data Processing', 'Report Generation', 'Metrics Analysis', 'Trend Prediction'],
-    customer_support: ['Ticket Management', 'Email Automation', 'Chat Support', 'FAQ Generation'],
-    marketing: ['Campaign Management', 'Content Creation', 'Social Media', 'Analytics Tracking'],
-    security: ['Threat Detection', 'Access Management', 'Compliance Monitoring', 'Security Audits'],
-    ai_coordinator: ['Task Distribution', 'Resource Optimization', 'Workflow Management', 'Performance Analytics']
-  };
-  
-  return capabilities[agentType] || [];
-}
-
-function getRecentTasks(agentId: string) {
-  // Mock recent tasks - will be replaced with database queries
-  return [
-    {
-      id: `task_${agentId}_1`,
-      title: 'Sample Task 1',
-      status: 'completed',
-      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      completedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: `task_${agentId}_2`, 
-      title: 'Sample Task 2',
-      status: 'in_progress',
-      createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-      completedAt: null
-    },
-    {
-      id: `task_${agentId}_3`,
-      title: 'Sample Task 3',
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      completedAt: null
-    }
-  ];
-}
-
-function getPerformanceMetrics(agentId: string) {
-  return {
-    tasksThisWeek: Math.floor(Math.random() * 20) + 5,
-    averageTaskTime: Math.floor(Math.random() * 30) + 15, // minutes
-    successRate: Math.floor(Math.random() * 10) + 90, // percentage
-    lastWeekComparison: {
-      tasks: Math.floor(Math.random() * 10) - 5,
-      efficiency: Math.floor(Math.random() * 10) - 5
-    }
-  };
-}
 
 router.get('/', getAllAgents);
 router.get('/:id', getAgentById);
