@@ -19,9 +19,10 @@ export interface AgentStatusChangeEvent {
 }
 
 export const AGENT_STATUS_CHANGED_EVENT = 'agent:status:changed';
+export const AGENT_STATUS_CHANGED_ROOM_EVENT = 'agent:status:changed:room';
 
 export class AgentService {
-  private static readonly eventEmitter = new EventEmitter();
+  private static readonly eventEmitter = new EventEmitter().setMaxListeners(50);
   private static socketServer: SocketServer | null = null;
 
   static setSocketServer(io: SocketServer): void {
@@ -170,7 +171,9 @@ export class AgentService {
 
     if (AgentService.socketServer) {
       AgentService.socketServer.emit(AGENT_STATUS_CHANGED_EVENT, event);
-      AgentService.socketServer.to(`agent-${event.agentId}`).emit(AGENT_STATUS_CHANGED_EVENT, event);
+      AgentService.socketServer
+        .to(`agent-${event.agentId}`)
+        .emit(AGENT_STATUS_CHANGED_ROOM_EVENT, event);
     }
 
     logger.debug('Agent status change event emitted', {
