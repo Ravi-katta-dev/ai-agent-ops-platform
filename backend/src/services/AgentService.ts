@@ -1,6 +1,8 @@
 import { prisma } from '../lib/prisma';
 import { logger } from '../utils/logger';
 import { AgentStatus } from '@prisma/client';
+import { EventEmitter } from 'events';
+import type { Server as SocketServer } from 'socket.io';
 
 export interface UpdateAgentStatusParams {
   agentId: string;
@@ -16,7 +18,24 @@ export interface AgentStatusChangeEvent {
   reason?: string;
 }
 
+export const AGENT_STATUS_CHANGED_EVENT = 'agent:status:changed';
+
 export class AgentService {
+  private static readonly eventEmitter = new EventEmitter();
+  private static socketServer: SocketServer | null = null;
+
+  static setSocketServer(io: SocketServer): void {
+    AgentService.socketServer = io;
+  }
+
+  static onStatusChange(listener: (event: AgentStatusChangeEvent) => void): void {
+    AgentService.eventEmitter.on(AGENT_STATUS_CHANGED_EVENT, listener);
+  }
+
+  static offStatusChange(listener: (event: AgentStatusChangeEvent) => void): void {
+    AgentService.eventEmitter.off(AGENT_STATUS_CHANGED_EVENT, listener);
+  }
+
   /**
    * Update agent status with validation and logging
    */
@@ -147,11 +166,19 @@ export class AgentService {
    * This can be extended to publish to message queues, WebSocket listeners, etc.
    */
   private emitStatusChangeEvent(event: AgentStatusChangeEvent): void {
-    // TODO: Integrate with WebSocket server or EventEmitter
-    // Example: this.eventEmitter.emit('agent:status:changed', event);
+    AgentService.eventEmitter.emit(AGENT_STATUS_CHANGED_EVENT, event);
+
+    if (AgentService.socketServer) {
+      AgentService.socketServer.emit(AGENT_STATUS_CHANGED_EVENT, event);
+      AgentService.socketServer.to(`agent-${event.agentId}`).emit(AGENT_STATUS_CHANGED_EVENT, event);
+    }
+
     logger.debug('Agent status change event emitted', {
       agentId: event.agentId,
-      newStatus: event.newStatus
+      previousStatus: event.previousStatus,
+      newStatus: event.newStatus,
+      hasSocketServer: Boolean(AgentService.socketServer),
+      listenerCount: AgentService.eventEmitter.listenerCount(AGENT_STATUS_CHANGED_EVENT)
     });
   }
 

@@ -9,6 +9,7 @@ import dotenv from 'dotenv';
 import { errorHandler, notFound } from './middleware/errorHandler';
 import { logger } from './utils/logger';
 import { connectDatabase } from './config/database';
+import { AgentService } from './services/AgentService';
 
 // Import routes
 import agentRoutes from './routes/agents';
@@ -91,6 +92,7 @@ io.on('connection', (socket) => {
 
 // Make io available to other modules
 app.set('io', io);
+AgentService.setSocketServer(io);
 
 // Start server
 async function startServer() {
